@@ -23,6 +23,8 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.request.RequestOptions;
 import java.io.File;
 
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.util.Objects;
 
 import pub.devrel.easypermissions.AfterPermissionGranted;
@@ -47,7 +49,10 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     //图片
     private ImageView ivPicture;
-    private Uri photoUri;
+    private Uri photoUri,resultUri;
+    private Bitmap originBitmap,cropBitmap;
+
+    private boolean showShareButton=false;
 
     /**
      * Glide请求图片选项配置
@@ -94,6 +99,15 @@ public class MainActivity extends AppCompatActivity {
         File cropFile = new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), fileName);
         return Uri.fromFile(cropFile);
     }
+    private Bitmap getBitmap(Uri uri) {
+        try {
+            Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), uri);
+            return bitmap;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
     /**
      * 打开相册
      */
@@ -131,7 +145,18 @@ public class MainActivity extends AppCompatActivity {
                 .withMaxResultSize(200, 200)
                 .start(this);
     }
-
+    private Uri saveResultImage(Bitmap result){
+        String fileName = String.format("result_%s.jpg", System.currentTimeMillis());
+        File resultFile = new File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), fileName);
+        try{
+            OutputStream out=new FileOutputStream(resultFile);
+            result.compress(Bitmap.CompressFormat.JPEG,100,out);
+            out.close();
+            return Uri.fromFile(resultFile);
+        }catch (Exception e){
+        }
+        return null;
+    }
     /**
      * 返回Activity结果
      *
@@ -144,18 +169,28 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == OPEN_ALBUM_CODE && resultCode == RESULT_OK) {
             //打开相册返回
-            final Uri imageUri = Objects.requireNonNull(data).getData();
+            photoUri = Objects.requireNonNull(data).getData();
             //图片剪裁
-            pictureCropping(imageUri);
+            pictureCropping(photoUri);
         }if (requestCode == OPEN_CAMERA_CODE && resultCode == RESULT_OK) {
             //打开相册返回
             pictureCropping(photoUri);
         }
         else if (requestCode == UCrop.REQUEST_CROP && resultCode == RESULT_OK) {
             //图片剪裁返回
-            final Uri image = UCrop.getOutput(data);
-            Glide.with(this).load(image).into(ivPicture);
-
+            final Uri cropUri = UCrop.getOutput(data);
+            originBitmap=getBitmap(photoUri);
+            cropBitmap=getBitmap(cropUri);
+            ivPicture.setImageURI(saveResultImage(cropBitmap));//这一行是临时的，用来显示截取好的图片，最终应显示合成好的
+            //从截取的bitmap获取黑度：蒋世杰
+            //int blackness=getBlackness(cropBitmap);
+            //拼接原图，截图和黑度信息，生成最终结果图片：李纪群(合成图片)，王鼎然(将黑度信息转图片)
+            //Bitmap resultBitmap=composeImage(originBitmap,cropBitmap,blackness);
+            //ivPicture.setImageBitmap(resultBitmap);
+            //提供分享按钮(右上角)和对应的shareResult回调函数：聂昊
+            //resultUri=saveResultImage(resultBitmap); //保存已经写好
+            //showShareButton=true; //按钮在这个为true时才显示
+            //回调函数:  shareResult(resultBitmap);
         }
     }
 
